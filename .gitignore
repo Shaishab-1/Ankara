@@ -1,0 +1,19 @@
+# Build artifacts
+build/
+*.o
+*.obj
+*.exe
+
+# Flex/Bison generated files (source of truth is the .l and .y files)
+*.tab.c
+*.tab.h
+*.tab.cpp
+*.tab.hpp
+lex.yy.c
+lex.yy.cpp
+
+# Editor/OS junk
+.vscode/
+.idea/
+*.swp
+.DS_Store

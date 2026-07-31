@@ -27,7 +27,9 @@ make
 ```
 
 ## Team
-- (add team member names here)
+- Saittajit Paul Soumo
+- Arjun Das Shaishab
+- Syed Jabedul Islam
 
 ## License
 Academic project — Compiler Construction Lab, Metropolitan University Bangladesh.

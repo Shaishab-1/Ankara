@@ -2,78 +2,88 @@
 /*
  * lexer.l
  * Flex specification for the Mini Programming Language.
- * Milestone 2: standalone lexer, not yet wired to Bison.
- * Each rule stores a full Token (type + lexeme + line) into the
- * global `currentToken`, then returns 1 so the test driver knows
- * "a token was produced". Flex automatically returns 0 at EOF.
+ * Milestone 3: now integrated with the Bison parser.
+ * Token codes (INT, PLUS, ID, ...) and the yylval union type
+ * come from parser.tab.h, which Bison generates from parser.y.
  */
-#include "tokens.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "parser.tab.h"
 
-int currentLine = 1;
-Token currentToken;
-
-static Token makeToken(TokenType type) {
-    Token t;
-    t.type   = type;
-    t.lexeme = yytext;
-    t.line   = currentLine;
-    return t;
-}
+int line_number = 1;
+int lexical_error_count = 0;
 %}
 
 %option noyywrap noinput nounput
 
-DIGIT    [0-9]
-LETTER   [a-zA-Z_]
-ID       {LETTER}({LETTER}|{DIGIT})*
-INTLIT   {DIGIT}+
-FLOATLIT {DIGIT}+"."{DIGIT}+
+DIGIT       [0-9]
+LETTER      [a-zA-Z_]
+ID          {LETTER}({LETTER}|{DIGIT})*
+INT_CONST   {DIGIT}+
+FLOAT_CONST {DIGIT}+"."{DIGIT}+
 
 %%
 
-"//".*                        { /* single-line comment: discard */ }
-"/*"([^*]|\*+[^*/])*\*+"/"     { /* block comment: discard */ }
+"//".*                     { /* single-line comment: discard */ }
+"/*"([^*]|\*+[^*/])*\*+"/" { /* block comment: discard */ }
 
-"int"     { currentToken = makeToken(TokenType::KW_INT);   return 1; }
-"float"   { currentToken = makeToken(TokenType::KW_FLOAT); return 1; }
-"bool"    { currentToken = makeToken(TokenType::KW_BOOL);  return 1; }
-"if"      { currentToken = makeToken(TokenType::KW_IF);    return 1; }
-"else"    { currentToken = makeToken(TokenType::KW_ELSE);  return 1; }
-"while"   { currentToken = makeToken(TokenType::KW_WHILE); return 1; }
-"print"   { currentToken = makeToken(TokenType::KW_PRINT); return 1; }
-"true"    { currentToken = makeToken(TokenType::KW_TRUE);  return 1; }
-"false"   { currentToken = makeToken(TokenType::KW_FALSE); return 1; }
+"int"     { return INT; }
+"float"   { return FLOAT; }
+"bool"    { return BOOL; }
+"if"      { return IF; }
+"else"    { return ELSE; }
+"while"   { return WHILE; }
+"print"   { return PRINT; }
+"true"    { return TRUE; }
+"false"   { return FALSE; }
 
-{FLOATLIT} { currentToken = makeToken(TokenType::FLOAT_LITERAL); return 1; }
-{INTLIT}   { currentToken = makeToken(TokenType::INT_LITERAL);   return 1; }
-{ID}       { currentToken = makeToken(TokenType::IDENTIFIER);    return 1; }
+"=="      { return EQ; }
+"!="      { return NEQ; }
+"<="      { return LE; }
+">="      { return GE; }
+"&&"      { return AND; }
+"||"      { return OR; }
+"<"       { return LT; }
+">"       { return GT; }
 
-"<="      { currentToken = makeToken(TokenType::LE); return 1; }
-">="      { currentToken = makeToken(TokenType::GE); return 1; }
-"=="      { currentToken = makeToken(TokenType::EQ); return 1; }
-"!="      { currentToken = makeToken(TokenType::NE); return 1; }
-"&&"      { currentToken = makeToken(TokenType::AND); return 1; }
-"||"      { currentToken = makeToken(TokenType::OR);  return 1; }
+"+"       { return PLUS; }
+"-"       { return MINUS; }
+"*"       { return MUL; }
+"/"       { return DIV; }
+"%"       { return MOD; }
+"!"       { return NOT; }
+"="       { return ASSIGN; }
 
-"<"       { currentToken = makeToken(TokenType::LT);     return 1; }
-">"       { currentToken = makeToken(TokenType::GT);     return 1; }
-"!"       { currentToken = makeToken(TokenType::NOT);    return 1; }
-"="       { currentToken = makeToken(TokenType::ASSIGN); return 1; }
-"+"       { currentToken = makeToken(TokenType::PLUS);   return 1; }
-"-"       { currentToken = makeToken(TokenType::MINUS);  return 1; }
-"*"       { currentToken = makeToken(TokenType::STAR);   return 1; }
-"/"       { currentToken = makeToken(TokenType::SLASH);  return 1; }
-"%"       { currentToken = makeToken(TokenType::PERCENT); return 1; }
+";"       { return SEMICOLON; }
+","       { return COMMA; }
+"("       { return LPAREN; }
+")"       { return RPAREN; }
+"{"       { return LBRACE; }
+"}"       { return RBRACE; }
 
-"{"       { currentToken = makeToken(TokenType::LBRACE);    return 1; }
-"}"       { currentToken = makeToken(TokenType::RBRACE);    return 1; }
-"("       { currentToken = makeToken(TokenType::LPAREN);    return 1; }
-")"       { currentToken = makeToken(TokenType::RPAREN);    return 1; }
-";"       { currentToken = makeToken(TokenType::SEMICOLON); return 1; }
+{FLOAT_CONST} {
+                yylval.fval = atof(yytext);
+                return FLOAT_CONST;
+            }
+{INT_CONST} {
+                yylval.ival = atoi(yytext);
+                return INT_CONST;
+            }
+{ID}        {
+                yylval.sval = strdup(yytext);
+                return ID;
+            }
 
-\n        { currentLine++; }
 [ \t\r]+  { /* whitespace: discard */ }
+\n        { line_number++; }
 
-.         { currentToken = makeToken(TokenType::LEX_ERROR); return 1; }
+.         {
+                fprintf(stderr,
+                        "Lexical Error at line %d: Invalid character '%c'\n",
+                        line_number,
+                        yytext[0]);
+                lexical_error_count++;
+          }
 
 %%

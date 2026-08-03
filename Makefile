@@ -7,7 +7,7 @@ TARGET    := $(BUILD_DIR)/compiler
 SRCS := src/main.cpp
 OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
-.PHONY: all clean lexer-test
+.PHONY: all clean lexer-test parser-test
 
 all: $(TARGET)
 
@@ -25,14 +25,27 @@ LEXER_TEST_TARGET:= $(BUILD_DIR)/lexer_test
 LEXER_TEST_SRCS  := src/lexer/tokens.cpp src/lexer/main_lexer.cpp
 
 lexer-test: $(LEXER_TEST_TARGET)
+# --- Parser testing (Milestone 3) ---
+PARSER_Y           := src/parser/parser.y
+PARSER_TAB_CPP      := $(BUILD_DIR)/parser.tab.cpp
+PARSER_TAB_H        := $(BUILD_DIR)/parser.tab.h
+PARSER_TEST_TARGET  := $(BUILD_DIR)/parser_test
+LEXER_GEN_FOR_PARSER:= $(BUILD_DIR)/lex.yy.for_parser.cpp
 
-$(LEXER_GEN): $(LEXER_L)
+.PHONY: parser-test
+
+parser-test: $(PARSER_TEST_TARGET)
+
+$(PARSER_TAB_CPP) $(PARSER_TAB_H): $(PARSER_Y)
 	@mkdir -p $(BUILD_DIR)
-	flex -o $(LEXER_GEN) $(LEXER_L)
+	bison -d --defines=$(PARSER_TAB_H) -o $(PARSER_TAB_CPP) $(PARSER_Y)
 
-$(LEXER_TEST_TARGET): $(LEXER_GEN) $(LEXER_TEST_SRCS)
+$(LEXER_GEN_FOR_PARSER): $(LEXER_L) $(PARSER_TAB_H)
 	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $(LEXER_GEN) $(LEXER_TEST_SRCS)
+	flex -o $(LEXER_GEN_FOR_PARSER) $(LEXER_L)
 
+$(PARSER_TEST_TARGET): $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER)
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -o $@ $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER)
 clean:
 	rm -rf $(BUILD_DIR)

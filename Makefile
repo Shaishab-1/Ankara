@@ -44,8 +44,8 @@ $(LEXER_GEN_FOR_PARSER): $(LEXER_L) $(PARSER_TAB_H)
 	@mkdir -p $(BUILD_DIR)
 	flex -o $(LEXER_GEN_FOR_PARSER) $(LEXER_L)
 
-$(PARSER_TEST_TARGET): $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER)
+$(PARSER_TEST_TARGET): $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER) src/symbol_table/symbol_table.cpp
 	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -o $@ $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER)
+	$(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -o $@ $(PARSER_TAB_CPP) $(LEXER_GEN_FOR_PARSER) src/symbol_table/symbol_table.cpp
 clean:
 	rm -rf $(BUILD_DIR)

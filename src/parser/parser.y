@@ -1,6 +1,7 @@
 %code requires {
     #include <vector>
     #include "../ast/ast.h"
+    #include "../symbol_table/symbol_table.h"
 }
 
 %{
@@ -12,6 +13,7 @@
 #include <stdlib.h>
 #include <vector>
 #include "../ast/ast.h"
+#include "../symbol_table/symbol_table.h"
 
 extern int line_number;          // defined in lexer.l
 extern int lexical_error_count;  // defined in lexer.l
@@ -22,6 +24,7 @@ void yyerror(const char* msg);
 
 // Root of the AST, filled in by the `program` rule's action.
 ASTNode* programRoot = nullptr;
+SymbolTable symTab;   // global symbol table, built during parsing
 %}
 
 /* ---- Semantic value types carried by tokens/rules ---- */
@@ -95,6 +98,7 @@ type:
 
 decl_stmt:
     type ID SEMICOLON {
+        symTab.insert(std::string($2), static_cast<VarType>($1), line_number);
         $$ = new DeclNode(static_cast<VarType>($1), std::string($2), line_number);
         free($2);
     }
@@ -133,7 +137,10 @@ print_stmt:
 
 /* ---- Nested block with its own scope (Section 5.2) ---- */
 block:
-    LBRACE stmt_list RBRACE { $$ = new BlockNode($2); }
+    LBRACE { symTab.enterScope(); } stmt_list RBRACE {
+        symTab.exitScope();
+        $$ = new BlockNode($3);
+    }
     ;
 
 /* ---- Expressions ---- */
@@ -201,5 +208,13 @@ int main(int argc, char** argv) {
     if (programRoot) {
         programRoot->print(0);
     }
+
+    printf("\n=== Global Scope Symbol Table (after parsing) ===\n");
+    if (symTab.lookup("x")) {
+        printf("(debug) 'x' is visible in global scope after parsing.\n");
+    } else {
+        printf("(debug) 'x' is NOT visible in global scope (expected if declared inside a block).\n");
+    }
+
     return 0;
 }

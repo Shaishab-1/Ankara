@@ -1,12 +1,16 @@
+%code requires {
+    #include <vector>
+    #include "../ast/ast.h"
+}
+
 %{
 /*
  * parser.y
- * Bison grammar for the Mini Programming Language.
- * Milestone 3: validates syntax only (no AST construction yet,
- * no semantic checks yet). AST building is added in Milestone 4.
+ * ...
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 #include "../ast/ast.h"
 
 extern int line_number;          // defined in lexer.l
@@ -15,13 +19,18 @@ int syntax_error_count = 0;
 
 extern int yylex();
 void yyerror(const char* msg);
+
+// Root of the AST, filled in by the `program` rule's action.
+ASTNode* programRoot = nullptr;
 %}
 
-/* ---- Semantic value types carried by tokens ---- */
+/* ---- Semantic value types carried by tokens/rules ---- */
 %union {
     int    ival;
     double fval;
     char*  sval;
+    ASTNode* node;
+    std::vector<ASTNode*>* nodelist;
 }
 
 /* ---- Tokens with a value ---- */
@@ -37,10 +46,12 @@ void yyerror(const char* msg);
 %token PLUS MINUS MUL DIV MOD NOT ASSIGN
 %token SEMICOLON COMMA LPAREN RPAREN LBRACE RBRACE
 
-/* ---- Operator precedence, lowest to highest ----
- * Following Section 5.3 of the manual: logical, then relational,
- * then arithmetic, matching standard language conventions.
- */
+/* ---- Non-terminal value types ---- */
+%type <node> stmt decl_stmt assign_stmt if_stmt while_stmt print_stmt block expr
+%type <nodelist> stmt_list
+%type <ival> type
+
+/* ---- Operator precedence, lowest to highest ---- */
 %left OR
 %left AND
 %right NOT
@@ -54,83 +65,103 @@ void yyerror(const char* msg);
 
 /* ---- Program structure ---- */
 program:
-    stmt_list
+    stmt_list { programRoot = new ProgramNode($1); }
     ;
 
 stmt_list:
-    /* empty */
-    | stmt_list stmt
+    /* empty */                { $$ = new std::vector<ASTNode*>(); }
+    | stmt_list stmt           {
+                                    if ($2) $1->push_back($2);
+                                    $$ = $1;
+                                }
     ;
 
 stmt:
-    decl_stmt
-    | assign_stmt
-    | if_stmt
-    | while_stmt
-    | print_stmt
-    | block
-    | error SEMICOLON   { syntax_error_count++; }
+    decl_stmt     { $$ = $1; }
+    | assign_stmt { $$ = $1; }
+    | if_stmt     { $$ = $1; }
+    | while_stmt  { $$ = $1; }
+    | print_stmt  { $$ = $1; }
+    | block       { $$ = $1; }
+    | error SEMICOLON { $$ = nullptr; syntax_error_count++; }
     ;
 
 /* ---- Declarations ---- */
 type:
-    INT
-    | FLOAT
-    | BOOL
+    INT   { $$ = static_cast<int>(VarType::TYPE_INT); }
+    | FLOAT { $$ = static_cast<int>(VarType::TYPE_FLOAT); }
+    | BOOL  { $$ = static_cast<int>(VarType::TYPE_BOOL); }
     ;
 
 decl_stmt:
-    type ID SEMICOLON
+    type ID SEMICOLON {
+        $$ = new DeclNode(static_cast<VarType>($1), std::string($2), line_number);
+        free($2);
+    }
     ;
 
 /* ---- Assignment ---- */
 assign_stmt:
-    ID ASSIGN expr SEMICOLON
+    ID ASSIGN expr SEMICOLON {
+        $$ = new AssignNode(std::string($1), $3, line_number);
+        free($1);
+    }
     ;
 
 /* ---- Control flow ---- */
 if_stmt:
-    IF LPAREN expr RPAREN block
-    | IF LPAREN expr RPAREN block ELSE block
+    IF LPAREN expr RPAREN block {
+        $$ = new IfNode($3, $5, nullptr);
+    }
+    | IF LPAREN expr RPAREN block ELSE block {
+        $$ = new IfNode($3, $5, $7);
+    }
     ;
 
 while_stmt:
-    WHILE LPAREN expr RPAREN block
+    WHILE LPAREN expr RPAREN block {
+        $$ = new WhileNode($3, $5);
+    }
     ;
 
 /* ---- print ---- */
 print_stmt:
-    PRINT expr SEMICOLON
+    PRINT expr SEMICOLON {
+        $$ = new PrintNode($2, line_number);
+    }
     ;
 
 /* ---- Nested block with its own scope (Section 5.2) ---- */
 block:
-    LBRACE stmt_list RBRACE
+    LBRACE stmt_list RBRACE { $$ = new BlockNode($2); }
     ;
 
 /* ---- Expressions ---- */
 expr:
-    expr OR expr
-    | expr AND expr
-    | NOT expr
-    | expr EQ expr
-    | expr NEQ expr
-    | expr LT expr
-    | expr GT expr
-    | expr LE expr
-    | expr GE expr
-    | expr PLUS expr
-    | expr MINUS expr
-    | expr MUL expr
-    | expr DIV expr
-    | expr MOD expr
-    | MINUS expr %prec UMINUS
-    | LPAREN expr RPAREN
-    | ID
-    | INT_CONST
-    | FLOAT_CONST
-    | TRUE
-    | FALSE
+    expr OR expr    { $$ = new BinaryOpNode("||", $1, $3); }
+    | expr AND expr { $$ = new BinaryOpNode("&&", $1, $3); }
+    | NOT expr      { $$ = new UnaryOpNode("!", $2); }
+    | expr EQ expr  { $$ = new BinaryOpNode("==", $1, $3); }
+    | expr NEQ expr { $$ = new BinaryOpNode("!=", $1, $3); }
+    | expr LT expr  { $$ = new BinaryOpNode("<", $1, $3); }
+    | expr GT expr  { $$ = new BinaryOpNode(">", $1, $3); }
+    | expr LE expr  { $$ = new BinaryOpNode("<=", $1, $3); }
+    | expr GE expr  { $$ = new BinaryOpNode(">=", $1, $3); }
+    | expr PLUS expr  { $$ = new BinaryOpNode("+", $1, $3); }
+    | expr MINUS expr { $$ = new BinaryOpNode("-", $1, $3); }
+    | expr MUL expr   { $$ = new BinaryOpNode("*", $1, $3); }
+    | expr DIV expr   { $$ = new BinaryOpNode("/", $1, $3); }
+    | expr MOD expr   { $$ = new BinaryOpNode("%", $1, $3); }
+    | MINUS expr %prec UMINUS { $$ = new UnaryOpNode("-", $2); }
+    | LPAREN expr RPAREN { $$ = $2; }
+    | ID {
+            $$ = new IdNode(std::string($1), line_number);
+            free($1);
+        }
+    | INT_CONST   { $$ = new IntLiteralNode($1); }
+    | FLOAT_CONST { $$ = new FloatLiteralNode($1); }
+    | TRUE  { $$ = new BoolLiteralNode(true); }
+    | FALSE { $$ = new BoolLiteralNode(false); }
     ;
 
 %%
@@ -139,6 +170,7 @@ void yyerror(const char* msg) {
     fprintf(stderr, "Syntax Error at line %d: %s\n", line_number, msg);
     syntax_error_count++;
 }
+
 int main(int argc, char** argv) {
     extern FILE* yyin;
 
@@ -164,6 +196,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printf("Parsing completed successfully - no errors.\n");
+    printf("Parsing completed successfully - no errors.\n\n");
+    printf("=== Abstract Syntax Tree ===\n");
+    if (programRoot) {
+        programRoot->print(0);
+    }
     return 0;
 }

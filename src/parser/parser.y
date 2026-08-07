@@ -2,6 +2,7 @@
     #include <vector>
     #include "../ast/ast.h"
     #include "../symbol_table/symbol_table.h"
+    #include "../semantic/semantic_analyzer.h"
 }
 
 %{
@@ -209,12 +210,16 @@ int main(int argc, char** argv) {
         programRoot->print(0);
     }
 
-    printf("\n=== Global Scope Symbol Table (after parsing) ===\n");
-    if (symTab.lookup("x")) {
-        printf("(debug) 'x' is visible in global scope after parsing.\n");
-    } else {
-        printf("(debug) 'x' is NOT visible in global scope (expected if declared inside a block).\n");
+    printf("\n=== Semantic Analysis ===\n");
+    SemanticAnalyzer analyzer;
+    bool semanticOk = analyzer.analyze(dynamic_cast<ProgramNode*>(programRoot));
+
+    if (!semanticOk) {
+        fprintf(stderr, "\nCompilation failed: %d semantic error(s)\n",
+                analyzer.errorCount());
+        return 1;
     }
 
+    printf("No semantic errors found.\n");
     return 0;
 }

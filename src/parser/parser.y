@@ -3,6 +3,7 @@
     #include "../ast/ast.h"
     #include "../symbol_table/symbol_table.h"
     #include "../semantic/semantic_analyzer.h"
+    #include "../codegen/tac_generator.h"
 }
 
 %{
@@ -215,11 +216,18 @@ int main(int argc, char** argv) {
     bool semanticOk = analyzer.analyze(dynamic_cast<ProgramNode*>(programRoot));
 
     if (!semanticOk) {
-        fprintf(stderr, "\nCompilation failed: %d semantic error(s)\n",
-                analyzer.errorCount());
+        fprintf(stderr, "\nCompilation failed: %d semantic error(s)\n", analyzer.errorCount());
         return 1;
     }
 
     printf("No semantic errors found.\n");
+
+    printf("\n=== Three Address Code ===\n");
+    TACGenerator tacGen;
+    std::vector<std::string> tac = tacGen.generate(programRoot);
+    for (const std::string& line : tac) {
+        printf("%s\n", line.c_str());
+    }
+
     return 0;
 }

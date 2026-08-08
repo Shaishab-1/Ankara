@@ -15,8 +15,8 @@ Source (.mc) → Lexer → Parser → AST → Symbol Table → Semantic Analyzer
 | Name | GitHub |
 |---|---|
 | Arjun Das Shaishab | [Shaishab-1](https://github.com/Shaishab-1) |
-| Saittajit Paul Soumo | [saittajitsoumo] |(https://github.com/saittajitsoumo)
-| Syed Jabedul Islam | [JABEDSYED] |(https://github.com/JABEDSYED)
+| Saittajit Paul Soumo | [saittajitsoumo](https://github.com/saittajitsoumo) |
+| Syed Jabedul Islam | [JABEDSYED](https://github.com/JABEDSYED) |
 
 ## Language Features
 
